@@ -24,7 +24,18 @@ def generate_paths(width, height, point_count):
         print('Creating lines radiating from {}, {}'.format(start.x, start.y))
 
         for _ in range(random.randint(2,4)):
-            paths.append(LineString([start, create_collision(start, paths)]))
+            end = None
+            attempts = 0
+            while attempts < 10:
+                attempts += 1
+                end = create_collision(start, paths)
+                if end is not None:
+                    candidate_path = LineString([start, end])
+                    if candidate_path.length > 2*THRESHHOLD_DISTANCE:
+                        print('Path created after {} attempts'.format(attempts))
+                        attempts += 10
+                        paths.append(candidate_path)
+                        continue
 
     return paths
 
@@ -36,26 +47,29 @@ def create_collision(start, paths):
     nearest_distance = None
 
     direction_vec = Point(random.uniform(-10000, 10000), random.uniform(-10000, 10000))
-    print('Direction vector: {}'.format(direction_vec))
+    print('\tDirection vector: {}'.format(direction_vec))
 
     pointy = LineString([start, Point(start.x + direction_vec.x, start.y + direction_vec.y)])
     for path in paths:
+        if start.distance(path) < 1:
+            continue
+
         if pointy.intersects(path):
             intersection_point = pointy.intersection(path)
-            if intersection_point.distance(start) < 1:
-                continue
+            distance = start.distance(intersection_point)
 
-            if intersection_point.distance(start) < THRESHHOLD_DISTANCE:
-                return create_collision(start, paths)
+            if distance < THRESHHOLD_DISTANCE:
+                return None
 
-            print('Collision with path {} at {}'.format(path, intersection_point))
+            print('\tCollision with path {} at {}'.format(path, intersection_point))
             if nearest_collision is None:
                 nearest_collision = intersection_point
-                nearest_distance = start.distance(intersection_point)
-            elif pointy.distance(path) < nearest_distance:
+                nearest_distance = distance
+            elif distance < nearest_distance:
+                print('\t\tNew nearest collision at {}'.format(intersection_point))
                 nearest_collision = intersection_point
-                nearest_distance = start.distance(intersection_point)
-            print('Nearest collision: {}'.format(intersection_point))
+                nearest_distance = distance
+            print('\tNearest collision: {}'.format(intersection_point))
 
     return nearest_collision
 
@@ -86,12 +100,12 @@ def main():
     print('Creating test.svg...')
     width = 343
     height = 398
-    border_width = 14
-    interior_line_width = 10
+    border_width = 10
+    interior_line_width = 5
     dwg = create_svg('test.svg', width, height, border_width)
 
     for path in generate_paths(width-border_width, height-border_width, 25):
-        print('Adding path {}'.format(path))
+        # print('Adding path {}'.format(path))
         start = ('{}mm'.format(path.coords[0][0]+border_width/2), '{}mm'.format(path.coords[0][1]+border_width/2))
         end = ('{}mm'.format(path.coords[1][0]+border_width/2), '{}mm'.format(path.coords[1][1]+border_width/2))
         stroke_width = '{}mm'.format(interior_line_width)
